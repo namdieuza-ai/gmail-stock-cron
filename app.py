@@ -13,7 +13,6 @@ CHAT_IDS = [8554175804, 5696721438]
 last_stock = 0
 current_stock = 0
 
-# Giờ Việt Nam (UTC+7)
 VN_TZ = timezone(timedelta(hours=7))
 
 def vn_time():
@@ -23,14 +22,32 @@ def send_telegram(chat_id, message):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {"chat_id": chat_id, "text": message, "parse_mode": "HTML"}
     try:
-        r = requests.post(url, json=payload, timeout=10)
-        return r.status_code == 200
+        requests.post(url, json=payload, timeout=10)
     except:
-        return False
+        pass
 
 def broadcast(message):
     for cid in CHAT_IDS:
         send_telegram(cid, message)
+
+# ================== TỰ ĐỘNG SET MENU KHI APP KHỞI ĐỘNG ==================
+def setup_telegram():
+    print("🔧 Đang set webhook + menu...")
+    webhook_url = "https://gmail-stock-cron.onrender.com/webhook"
+    
+    requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook", json={"url": webhook_url})
+    
+    commands = [
+        {"command": "start", "description": "Bắt đầu & hướng dẫn"},
+        {"command": "check", "description": "Xem stock hiện tại"},
+        {"command": "status", "description": "Xem trạng thái bot"},
+        {"command": "test", "description": "Test thông báo"}
+    ]
+    requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/setMyCommands", json={"commands": commands})
+    print("✅ Đã set menu thành công!")
+
+setup_telegram()
+# =======================================================================
 
 @app.route('/webhook', methods=['POST'])
 def telegram_webhook():
@@ -43,29 +60,26 @@ def telegram_webhook():
         text = msg.get("text", "").strip()
 
         if text == "/start":
-            intro = f"""<b>👋 Xin chào! Đây là Bot Monitor Stock Gmail</b>
+            intro = f"""<b>👋 Xin chào! Bot Monitor Stock Gmail</b>
 
 📧 <b>Gmail 10 Phút - VERIFY ACC GAME</b>
 
-✅ Bot sẽ tự động thông báo ngay khi stock > 0
-🔄 Kiểm tra stock mỗi 1 phút
+✅ Tự động thông báo khi stock > 0
+🔄 Check mỗi 1 phút
 
-📌 Các lệnh nhanh:
-• /stock  → Xem stock hiện tại
-• /check  → Check stock ngay
-• /status → Xem trạng thái bot
+📌 Lệnh:
+• /check  → Xem stock hiện tại
+• /status → Trạng thái bot
 • /test   → Test thông báo
 
-🕒 Thời gian hiển thị theo giờ Việt Nam
-Bot đang chạy ổn định trên Render + cron-job.org"""
+🕒 Giờ Việt Nam"""
             send_telegram(chat_id, intro)
 
-        elif text in ["/stock", "/check"]:
+        elif text == "/check":
             try:
                 r = requests.get(API_URL, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
                 stock = r.json().get("data", {}).get("stock", 0)
                 current_stock = stock
-
                 reply = f"""📦 <b>Stock hiện tại</b>
 
 Gmail 10 Phút - VERIFY ACC GAME
@@ -73,32 +87,27 @@ Stock: <b>{stock}</b>
 ⏰ {vn_time()}"""
                 send_telegram(chat_id, reply)
             except:
-                send_telegram(chat_id, "❌ Lỗi khi lấy stock, thử lại sau")
+                send_telegram(chat_id, "❌ Lỗi lấy stock")
 
         elif text == "/status":
-            send_telegram(chat_id, f"✅ Bot đang chạy bình thường\nStock hiện tại: <b>{current_stock}</b>\n⏰ {vn_time()}")
+            send_telegram(chat_id, f"✅ Bot đang chạy tốt\nStock hiện tại: <b>{current_stock}</b>\n⏰ {vn_time()}")
 
         elif text == "/test":
             send_telegram(chat_id, f"🔥 Test thông báo thành công\n⏰ {vn_time()}")
 
     return "OK", 200
 
-@app.route('/set_webhook')
-def set_webhook():
-    webhook_url = "https://gmail-stock-cron.onrender.com/webhook"
-    # Set webhook
-    r1 = requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook", json={"url": webhook_url})
-    # Set menu
+@app.route('/reset_menu')
+def reset_menu():
+    """Buộc reset menu (dùng khi nút Menu không hiện)"""
     commands = [
         {"command": "start", "description": "Bắt đầu & hướng dẫn"},
-        {"command": "stock", "description": "Xem stock hiện tại"},
-        {"command": "check", "description": "Check stock ngay"},
+        {"command": "check", "description": "Xem stock hiện tại"},
         {"command": "status", "description": "Xem trạng thái bot"},
         {"command": "test", "description": "Test thông báo"}
     ]
-    r2 = requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/setMyCommands", json={"commands": commands})
-
-    return f"✅ Setup webhook + menu thành công!", 200
+    r = requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/setMyCommands", json={"commands": commands})
+    return f"✅ Đã reset menu thành công!", 200
 
 @app.route('/check')
 def background_check():
@@ -115,10 +124,10 @@ Gmail 10 Phút - VERIFY ACC GAME
 Stock hiện tại: <b>{stock}</b>
 ⏰ {vn_time()}"""
             broadcast(message)
-            print(f"✅ GỬI THÔNG BÁO - Stock = {stock} lúc {vn_time()}")
+            print(f"✅ GỬI THÔNG BÁO - Stock = {stock}")
 
         else:
-            print(f"Stock hiện tại: {stock} - {vn_time()}")
+            print(f"Stock hiện tại: {stock}")
 
         if stock == 0:
             last_stock = 0
@@ -132,7 +141,7 @@ Stock hiện tại: <b>{stock}</b>
 
 @app.route('/')
 def home():
-    return "<h1>✅ Bot Telegram Stock Gmail (giờ VN) đang chạy tốt!<br><a href='/set_webhook'>🔧 Set webhook + menu</a></h1>"
+    return "<h1>✅ Bot đang chạy!<br><a href='/reset_menu'>🔄 Reset Menu (nếu nút Menu chưa hiện)</a></h1>"
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
