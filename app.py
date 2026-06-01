@@ -16,7 +16,7 @@ current_stock = 0
 VN_TZ = timezone(timedelta(hours=7))
 
 def vn_time():
-    return datetime.now(VN_TZ).strftime("%H:%M:%S %d/%m/%Y")
+    return datetime.now(VN_TZ).strftime("%H:%M:%S - %d/%m/%Y")
 
 def send_telegram(chat_id, message):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
