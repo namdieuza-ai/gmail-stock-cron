@@ -6,9 +6,28 @@ import os
 app = Flask(__name__)
 
 API_URL = "https://shopgmail9999.com/api/BuyGmail/GetstockGmail?apikey=183ac98abf6442e18d405d5dc233b793&id=8"
-NTFY_TOPIC = "gmail-stock-9999"   # ← topic của bạn
+NTFY_TOPIC = "gmail-stock-9999"   # ← Phải đúng y chang dòng này
 
 last_stock = 0
+
+def send_to_ntfy(message, title="Gmail Stock Alert!"):
+    try:
+        r = requests.post(
+            f"https://ntfy.sh/{NTFY_TOPIC}",
+            headers={
+                "Title": title,
+                "Priority": "high",
+                "Tags": "rocket,mail",
+                "Content-Type": "text/plain; charset=utf-8"
+            },
+            data=message,
+            timeout=10
+        )
+        print(f"NTFY RESPONSE → Status: {r.status_code} | Text: {r.text[:200]}")
+        return r.status_code == 200
+    except Exception as e:
+        print(f"NTFY ERROR: {e}")
+        return False
 
 @app.route('/check')
 def check_stock():
@@ -32,23 +51,15 @@ Gmail 10 Phút - VERIFY ACC GAME
 Stock hiện tại: {stock}
 ⏰ {time.strftime("%H:%M:%S %d/%m/%Y")}"""
 
-            # Sửa encoding utf-8 để tránh lỗi emoji
-            requests.post(
-                f"https://ntfy.sh/{NTFY_TOPIC}",
-                headers={
-                    "Title": "Gmail Stock Alert!",      # bỏ emoji 🔥
-                    "Priority": "high",
-                    "Tags": "rocket,mail",
-                    "Content-Type": "text/plain; charset=utf-8"
-                },
-                data=message.encode('utf-8')            # ép utf-8
-            )
-            print(f"GỬI NTFY - Stock = {stock}")        # bỏ emoji trong log
+            success = send_to_ntfy(message)
+            if success:
+                print(f"✅ GỬI NTFY THÀNH CÔNG - Stock = {stock}")
+            else:
+                print(f"❌ GỬI NTFY THẤT BẠI - Stock = {stock}")
 
         else:
             print(f"Stock hiện tại: {stock}")
 
-        # Reset logic
         if stock == 0:
             last_stock = 0
         else:
@@ -60,9 +71,16 @@ Stock hiện tại: {stock}
         print(f"Lỗi: {str(e)}")
         return "ERROR", 500
 
+@app.route('/test')
+def test_ntfy():
+    """Test gửi thông báo thủ công"""
+    message = "🔥 TEST THÔNG BÁO TỪ RENDER - " + time.strftime("%H:%M:%S")
+    success = send_to_ntfy(message, title="Test NTFY")
+    return f"Test gửi NTFY: {'Thành công' if success else 'Thất bại'}", 200
+
 @app.route('/')
 def home():
-    return "<h1>✅ Gmail Stock Monitor đang chạy!<br>Link cron: /check</h1>"
+    return "<h1>✅ Gmail Stock Monitor đang chạy!<br>Test: <a href='/test'>/test</a> | Check: /check</h1>"
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
