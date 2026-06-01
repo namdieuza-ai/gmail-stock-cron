@@ -5,9 +5,8 @@ import os
 
 app = Flask(__name__)
 
-# ←←← ĐÃ SỬA ID THÀNH 8
 API_URL = "https://shopgmail9999.com/api/BuyGmail/GetstockGmail?apikey=183ac98abf6442e18d405d5dc233b793&id=8"
-NTFY_TOPIC = "gmail-stock-9999"   # ←←← THAY BẰNG TÊN TOPIC NTFY CỦA BẠN
+NTFY_TOPIC = "gmail-stock-9999"   # ← topic của bạn
 
 last_stock = 0
 
@@ -33,15 +32,21 @@ Gmail 10 Phút - VERIFY ACC GAME
 Stock hiện tại: {stock}
 ⏰ {time.strftime("%H:%M:%S %d/%m/%Y")}"""
 
+            # Sửa encoding utf-8 để tránh lỗi emoji
             requests.post(
                 f"https://ntfy.sh/{NTFY_TOPIC}",
-                headers={"Title": "🔥 Gmail Stock Alert!", "Priority": "high", "Tags": "rocket,mail"},
-                data=message
+                headers={
+                    "Title": "Gmail Stock Alert!",      # bỏ emoji 🔥
+                    "Priority": "high",
+                    "Tags": "rocket,mail",
+                    "Content-Type": "text/plain; charset=utf-8"
+                },
+                data=message.encode('utf-8')            # ép utf-8
             )
-            print(f"✅ GỬI NTFY - Stock = {stock}")
+            print(f"GỬI NTFY - Stock = {stock}")        # bỏ emoji trong log
 
         else:
-            print(f"📦 Stock hiện tại: {stock}")
+            print(f"Stock hiện tại: {stock}")
 
         # Reset logic
         if stock == 0:
@@ -52,7 +57,7 @@ Stock hiện tại: {stock}
         return f"OK - Stock: {stock}", 200
 
     except Exception as e:
-        print("❌ Lỗi:", str(e))
+        print(f"Lỗi: {str(e)}")
         return "ERROR", 500
 
 @app.route('/')
